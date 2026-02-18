@@ -10,7 +10,8 @@ export const mockArenas: Arena[] = [
         stake: '50 USDC',
         poolYield: '+8.4% APY',
         status: 'ACTIVE',
-        isFeatured: true
+        isFeatured: true,
+        source: 'mock'
     },
     {
         id: '2',
@@ -20,7 +21,8 @@ export const mockArenas: Arena[] = [
         roundSpeed: '2 MIN',
         stake: '100 USDC',
         poolYield: '+9.1% APY',
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        source: 'mock'
     },
     {
         id: '3',
@@ -31,7 +33,8 @@ export const mockArenas: Arena[] = [
         roundSpeed: '5 MIN',
         stake: '10 USDC',
         poolYield: '+5.2% APY',
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        source: 'mock'
     },
     {
         id: '4',
@@ -42,7 +45,8 @@ export const mockArenas: Arena[] = [
         roundSpeed: '3 MIN',
         stake: '1000 USDC',
         poolYield: '+12.5% APY',
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        source: 'mock'
     },
     {
         id: '5',
@@ -53,6 +57,7 @@ export const mockArenas: Arena[] = [
         roundSpeed: '30 SEC',
         stake: '25 USDC',
         poolYield: '+15.2% APY',
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        source: 'mock'
     }
 ];

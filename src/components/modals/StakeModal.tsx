@@ -1,12 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { TrendingUp, CheckSquare, Zap, Info, Loader2, TerminalSquare, ShieldCheck } from "lucide-react";
-import { useWallet } from "@/shared-d/hooks/useWallet";
-import {
-  buildStakeProtocolTransaction,
-  submitSignedTransaction,
-} from "@/shared-d/utils/stellar-transactions";
+import { useWallet } from "@/features/wallet/useWallet";
+import { depositCreatorStake, parseEvmError } from "@/lib/contracts";
+import { MIN_CREATOR_STAKE_USDC } from "@/features/creator/hooks/useCreatorStatus";
 
 type TransactionState = "idle" | "signing" | "submitting" | "success" | "error";
 
@@ -23,34 +21,36 @@ export default function StakeModal({
   onClose,
   onSuccess,
   apy = 12.5,
-  connectionLabel = "SOROBAN_MAINNET_NODE_04",
+  connectionLabel = "ARBITRUM_MAINNET_NODE_04",
 }: StakeModalProps) {
-  const { address, isConnected, connect, signTransaction, balance, isLoadingBalance } =
-    useWallet();
+  const { status, address, connect } = useWallet();
+  const isConnected = status === "connected";
 
-  const [amount, setAmount] = useState<string>("5000.00");
+  const [amount, setAmount] = useState<string>("4");
   const [txState, setTxState] = useState<TransactionState>("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   const isProcessing = txState === "signing" || txState === "submitting";
-  const displayBalance = balance.xlm;
   const numAmount = parseFloat(amount) || 0;
-  const isValidAmount = numAmount > 0 && numAmount <= displayBalance;
+  const isValidAmount = numAmount >= MIN_CREATOR_STAKE_USDC;
   const isButtonDisabled =
     isProcessing ||
     txState === "success" ||
     (isConnected && !isValidAmount);
 
-  useEffect(() => {
+  // Reset state when modal closes — done during render to avoid setState-in-effect lint rule
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (prevIsOpen !== isOpen) {
+    setPrevIsOpen(isOpen);
     if (!isOpen) {
       setTxState("idle");
       setErrorMessage("");
     }
-  }, [isOpen]);
+  }
 
   const handleInitiateStake = async () => {
     if (!isConnected) {
-      await connect();
+      connect();
       return;
     }
 
@@ -60,24 +60,16 @@ export default function StakeModal({
       return;
     }
 
-    if (isNaN(numAmount) || numAmount <= 0) {
-      setErrorMessage("Please enter a valid amount");
-      setTxState("error");
-      return;
-    }
-    if (numAmount > displayBalance) {
-      setErrorMessage("Insufficient balance");
+    if (isNaN(numAmount) || numAmount < MIN_CREATOR_STAKE_USDC) {
+      setErrorMessage(`Minimum creator stake is ${MIN_CREATOR_STAKE_USDC} USDC`);
       setTxState("error");
       return;
     }
 
     try {
       setTxState("signing");
-      const tx = await buildStakeProtocolTransaction(address, numAmount);
-      const signedXdr = await signTransaction(tx.toXDR());
-
-      setTxState("submitting");
-      await submitSignedTransaction(signedXdr);
+      setErrorMessage("");
+      await depositCreatorStake(address, numAmount);
 
       setTxState("success");
       setTimeout(() => {
@@ -85,8 +77,7 @@ export default function StakeModal({
         onClose();
       }, 1500);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Transaction failed. Please try again.";
-      setErrorMessage(message);
+      setErrorMessage(parseEvmError(err));
       setTxState("error");
     }
   };
@@ -121,8 +112,7 @@ export default function StakeModal({
             <TerminalSquare className="h-6 w-6 text-zinc-400" />
           </div>
           <p className="mt-2 font-mono text-xs uppercase tracking-wider text-zinc-400">
-            STAKE XLM TO ACTIVATE HOST PRIVILEGES. STAKED FUNDS GENERATE
-            CONTINUOUS RWA YIELD.
+            STAKE AT LEAST {MIN_CREATOR_STAKE_USDC} USDC TO CREATE POOLS. WITHDRAW ONLY WHEN YOU HAVE NO ACTIVE GAMES.
           </p>
         </div>
 
@@ -132,15 +122,8 @@ export default function StakeModal({
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="font-mono text-sm font-medium uppercase tracking-wider text-zinc-800">
-                XLM AMOUNT
+                USDC AMOUNT (MIN {MIN_CREATOR_STAKE_USDC})
               </label>
-              <span className="border border-zinc-800 bg-lime-400 px-2.5 py-1 font-mono text-xs font-bold text-black">
-                {isLoadingBalance ? (
-                  "LOADING..."
-                ) : (
-                  <>BALANCE: {displayBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}</>
-                )}
-              </span>
             </div>
             <div className="flex items-center rounded-sm border-2 border-zinc-300 bg-white px-4 py-3 transition-colors focus-within:border-zinc-400">
               <input
@@ -151,13 +134,12 @@ export default function StakeModal({
                 className="min-w-0 flex-1 bg-transparent font-mono text-3xl font-bold text-zinc-900 outline-none placeholder:text-zinc-400 disabled:opacity-50 md:text-4xl"
                 placeholder="0.00"
               />
-              <span className="ml-4 shrink-0 font-mono text-lg font-bold text-zinc-800">XLM</span>
+              <span className="ml-4 shrink-0 font-mono text-lg font-bold text-zinc-800">USDC</span>
             </div>
           </div>
 
           {/* Status Cards */}
           <div className="grid grid-cols-2 gap-3">
-            {/* APY Card */}
             <div className="rounded-sm border-2 border-lime-400 bg-black p-4">
               <div className="mb-2 flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-lime-400" />
@@ -170,7 +152,6 @@ export default function StakeModal({
               </p>
             </div>
 
-            {/* Privilege Card */}
             <div className="border-2 border-zinc-800 bg-white p-4">
               <div className="mb-3 flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-zinc-800" />
@@ -189,15 +170,14 @@ export default function StakeModal({
 
           {/* System Notice */}
           <div className="flex gap-3 rounded-sm border-l-4 border-lime-400 bg-lime-200/50 p-4">
-            <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-lime-600" />
+            <Info className="mt-0.5 h-5 w-5 shrink-0 text-lime-600" />
             <p className="font-mono text-xs uppercase leading-relaxed tracking-wide text-zinc-800">
               SYSTEM NOTICE: STAKING IS SUBJECT TO A 48-HOUR COOL-DOWN PERIOD FOR
-              UNSTAKING. YIELD IS DISTRIBUTED IN REAL-TIME TO YOUR CONNECTED STELLAR
-              WALLET.
+              UNSTAKING. YIELD IS DISTRIBUTED IN REAL-TIME TO YOUR CONNECTED
+              ARBITRUM WALLET.
             </p>
           </div>
 
-          {/* Success Message */}
           {txState === "success" && (
             <div className="rounded-sm border border-lime-400 bg-lime-400/20 p-4 text-center">
               <p className="font-mono text-sm font-bold uppercase text-lime-400">
@@ -206,7 +186,6 @@ export default function StakeModal({
             </div>
           )}
 
-          {/* Error Message */}
           {txState === "error" && errorMessage && (
             <div className="rounded-sm border border-red-500 bg-red-500/20 p-4 text-center">
               <p className="font-mono text-sm font-bold uppercase text-red-400">
@@ -215,7 +194,6 @@ export default function StakeModal({
             </div>
           )}
 
-          {/* Action Buttons */}
           <div className="space-y-3">
             <button
               onClick={handleInitiateStake}

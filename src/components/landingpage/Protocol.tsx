@@ -2,53 +2,116 @@ import React from 'react';
 
 const Protocol = () => {
     const steps = [
-        {
-            number: "01",
-            title: "STAKE AND JOIN ARENA",
-            description: "Stake your XLM to access the active pools. Your entry immediately begins generating RWA yield while the round prepares.",
-            bgColor: "bg-white",
-            textColor: "text-black",
-            icon: (
-                <div className="w-24 h-24 bg-[#09101D] p-5 border border-neon-green/20">
-                    <svg viewBox="0 0 24 24" fill="none" className="w-full h-full text-neon-green">
-                        <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" />
-                        <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
-                        <path d="M12 9V15M9 12H15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                </div>
-            )
-        },
-        {
-            number: "02",
-            title: "PICK A SIDE",
-            description: "Make your strategic choice between Heads or Tails. To survive the round, you must commit to the side that fewer players choose.",
-            bgColor: "bg-neon-green",
-            textColor: "text-black",
-            icon: (
-                <div className="w-24 h-24 bg-black p-5">
-                    <svg viewBox="0 0 24 24" fill="none" className="w-full h-full text-white">
-                        <path d="M17 10L21 6L17 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M7 14L3 18L7 22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M21 6H12C10 6 8 8 8 10V14C8 16 10 18 12 18H3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                </div>
-            )
-        },
-        {
-            number: "03",
-            title: "BE AMONG THE MINORITY TO WIN",
-            description: "Only the minority side survives and moves to the next round. Winners split the rewards, and everyone keeps their earned interest.",
-            bgColor: "bg-white",
-            textColor: "text-black",
-            icon: (
-                <div className="w-24 h-24 bg-[#09101D] p-5 border border-neon-green/20">
-                    <svg viewBox="0 0 24 24" fill="none" className="w-full h-full text-neon-green">
-                        <path d="M12 2L12 15M12 2L4 7M12 2L20 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M12 15L4 10V18L12 22L20 18V10L12 15Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                    </svg>
-                </div>
-            )
-        }
+      {
+        number: "01",
+        title: "STAKE AND JOIN ARENA",
+        description:
+          "Stake  ARB On InverseArena to be a pool creator or Join an active pool to be a  player. ",
+        bgColor: "bg-white",
+        textColor: "text-black",
+        icon: (
+          <div className="w-24 h-24 bg-[#09101D] p-5 border border-neon-green/20">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="w-full h-full text-neon-green"
+            >
+              <rect
+                x="3"
+                y="3"
+                width="18"
+                height="18"
+                rx="2"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <circle
+                cx="12"
+                cy="12"
+                r="3"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <path
+                d="M12 9V15M9 12H15"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+        ),
+      },
+      {
+        number: "02",
+        title: "PICK A SIDE",
+        description:
+          "Make your strategic choice between Heads or Tails. To survive the round, you must commit to the side that fewer players choose.",
+        bgColor: "bg-neon-green",
+        textColor: "text-black",
+        icon: (
+          <div className="w-24 h-24 bg-black p-5">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="w-full h-full text-white"
+            >
+              <path
+                d="M17 10L21 6L17 2"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M7 14L3 18L7 22"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M21 6H12C10 6 8 8 8 10V14C8 16 10 18 12 18H3"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+        ),
+      },
+      {
+        number: "03",
+        title: "BE AMONG THE MINORITY TO WIN",
+        description:
+          "Only the minority side survives and moves to the next round. Winners split the rewards, and everyone keeps their earned interest.",
+        bgColor: "bg-white",
+        textColor: "text-black",
+        icon: (
+          <div className="w-24 h-24 bg-[#09101D] p-5 border border-neon-green/20">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              className="w-full h-full text-neon-green"
+            >
+              <path
+                d="M12 2L12 15M12 2L4 7M12 2L20 7"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M12 15L4 10V18L12 22L20 18V10L12 15Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+        ),
+      },
     ];
 
     return (

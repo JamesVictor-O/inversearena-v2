@@ -29,7 +29,7 @@ const pressStart2P = Press_Start_2P({
 
 export const metadata: Metadata = {
   title: "Inverse Arena",
-  description: "Inverse Arena - Stellar Soroban",
+  description: "Inverse Arena - Arbitrum RWA-powered minority game",
 };
 
 export default function RootLayout({

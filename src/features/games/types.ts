@@ -11,4 +11,5 @@ export interface Arena {
     poolYield: string;
     status: 'ACTIVE' | 'PENDING' | 'CLOSED';
     isFeatured?: boolean;
+    source?: 'onchain' | 'mock';
 }

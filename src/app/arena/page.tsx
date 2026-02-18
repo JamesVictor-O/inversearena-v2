@@ -9,18 +9,18 @@ import {
   TotalYieldPot,
   RoundResolvedOverlay,
 } from "@/components/arena/core";
-import { useWallet } from "@/shared-d/hooks/useWallet";
+import { useWallet } from "@/features/wallet/useWallet";
 import { TransactionModal } from "@/components/modals/TransactionModal";
 import {
-  buildJoinArenaTransaction,
-  buildSubmitChoiceTransaction,
-  buildClaimWinningsTransaction,
-  submitSignedTransaction,
-  fetchArenaState
-} from "@/shared-d/utils/stellar-transactions";
+  joinArena,
+  submitChoice,
+  claimWinnings,
+  fetchArenaState,
+} from "@/lib/contracts";
 
 export default function ArenaPage() {
-  const { isConnected, address, connect, signTransaction, refreshBalance } = useWallet();
+  const { status, address, connect } = useWallet();
+  const isConnected = status === "connected";
   const [selectedChoice, setSelectedChoice] = useState<"heads" | "tails" | null>(null);
   const [isJoined, setIsJoined] = useState(false);
   const [hasWon, setHasWon] = useState(false);
@@ -28,7 +28,6 @@ export default function ArenaPage() {
   const [userStatus, setUserStatus] = useState("STILL IN");
   const [currentStake, setCurrentStake] = useState(1200);
   const [potentialPayout, setPotentialPayout] = useState(24420);
-  const [isLoadingArena, setIsLoadingArena] = useState(false);
 
   // Round Resolution State
   const [showRoundOverlay, setShowRoundOverlay] = useState(false);
@@ -40,8 +39,8 @@ export default function ArenaPage() {
   const [txType, setTxType] = useState<"JOIN" | "SUBMIT" | "CLAIM" | null>(null);
   const [txDetails, setTxDetails] = useState<{ label: string; value: string | number }[]>([]);
 
-  // Mock Arena ID
-  const ARENA_ID = "C...ARENA";
+  // Pool ID — use ?pool=N query param in the future; defaults to pool 1
+  const POOL_ID = 1n;
 
   // Mock data - would come from API/contract
   const headsYield = 42;
@@ -51,19 +50,17 @@ export default function ArenaPage() {
 
   const updateArenaState = useCallback(async () => {
     if (!address) return;
-    setIsLoadingArena(true);
     try {
-      const state = await fetchArenaState(ARENA_ID, address);
+      const state = await fetchArenaState(POOL_ID, address);
       setSurvivors({ current: state.survivorsCount, max: state.maxCapacity });
       setIsJoined(state.isUserIn);
       setHasWon(state.hasWon);
       setUserStatus(state.hasWon ? "WINNER!" : "STILL IN");
       setCurrentStake(state.currentStake);
       setPotentialPayout(state.potentialPayout);
+      setCurrentRound(state.currentRound || 1);
     } catch (error) {
       console.error("Failed to fetch arena state:", error);
-    } finally {
-      setIsLoadingArena(false);
     }
   }, [address]);
 
@@ -87,10 +84,10 @@ export default function ArenaPage() {
             </div>
             <div className="flex gap-3">
               <button className="border border-white/20 px-4 py-2 font-pixel text-[8px] text-white tracking-wider hover:bg-white/5">
-                SOROBAN LIVE
+                ARBITRUM LIVE
               </button>
               <button className="border border-white/20 px-4 py-2 font-pixel text-[8px] text-white tracking-wider hover:bg-white/5">
-                SOROBAN LIVE
+                ARBITRUM LIVE
               </button>
               <button
                 onClick={() => !isConnected && connect()}
@@ -112,8 +109,8 @@ export default function ArenaPage() {
                   setTxType("JOIN");
                   setTxDetails([
                     { label: "Action", value: "Join Arena" },
-                    { label: "Entry Fee", value: "100 XLM" }, // Example
-                    { label: "Arena ID", value: ARENA_ID },
+                    { label: "Entry Fee", value: "See wallet prompt" },
+                    { label: "Pool ID", value: POOL_ID.toString() },
                   ]);
                   setShowTxModal(true);
                 }}
@@ -173,7 +170,7 @@ export default function ArenaPage() {
                       setTxDetails([
                         { label: "Action", value: "Submit Choice" },
                         { label: "Choice", value: selectedChoice.toUpperCase() },
-                        { label: "Round", value: "#12" }, // Mock
+                        { label: "Round", value: `#${currentRound}` },
                       ]);
                       setShowTxModal(true);
                     }}
@@ -253,8 +250,8 @@ export default function ArenaPage() {
                       setTxType("CLAIM");
                       setTxDetails([
                         { label: "Action", value: "Claim Winnings" },
-                        { label: "Amount", value: "$24,420.00" },
-                        { label: "Arena ID", value: ARENA_ID },
+                        { label: "Amount", value: `$${potentialPayout.toLocaleString()}` },
+                        { label: "Pool ID", value: POOL_ID.toString() },
                       ]);
                       setShowTxModal(true);
                     }}
@@ -307,30 +304,18 @@ export default function ArenaPage() {
         onConfirm={async () => {
           if (!address || !txType) return;
 
-          try {
-            let tx;
-            if (txType === "JOIN") {
-              tx = await buildJoinArenaTransaction(address, ARENA_ID, 100);
-            } else if (txType === "SUBMIT" && selectedChoice) {
-              tx = await buildSubmitChoiceTransaction(address, ARENA_ID, selectedChoice === "heads" ? "Heads" : "Tails", 12);
-            } else if (txType === "CLAIM") {
-              tx = await buildClaimWinningsTransaction(address, ARENA_ID);
-            } else {
-              return;
-            }
-
-            const signedXdr = await signTransaction(tx.toXDR());
-            await submitSignedTransaction(signedXdr);
-
-            // Trigger real-time updates
-            await refreshBalance();
-            await updateArenaState();
-
-            setShowTxModal(false);
-          } catch (e) {
-            console.error(e);
-            throw e;
+          if (txType === "JOIN") {
+            await joinArena(address, POOL_ID, 0);
+          } else if (txType === "SUBMIT" && selectedChoice) {
+            await submitChoice(address, POOL_ID, selectedChoice === "heads" ? "Heads" : "Tails", currentRound);
+          } else if (txType === "CLAIM") {
+            await claimWinnings(address, POOL_ID);
+          } else {
+            return;
           }
+
+          await updateArenaState();
+          setShowTxModal(false);
         }}
       />
 

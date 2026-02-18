@@ -2,21 +2,24 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { useWallet } from "@/shared-d/hooks/useWallet";
 import { TransactionModal } from "@/components/modals/TransactionModal";
-import { buildCreatePoolTransaction, submitSignedTransaction } from "@/shared-d/utils/stellar-transactions";
+import { useWallet } from "@/features/wallet/useWallet";
+import {
+  createPool,
+  depositCreatorStake,
+  fetchCreatorStatus,
+  estimateGasFee,
+  formatFeeDisplay,
+  formatTotalCostDisplay,
+  parseEvmError,
+} from "@/lib/contracts";
+import { useNotificationContext } from "@/components/ui/NotificationProvider";
 import {
   validateStakeAmount,
   formatCurrencyInput,
   sanitizeNumericInput,
-  getDecimalPrecision,
   type Currency,
-} from "@/shared-d/utils/form-validation";
-import {
-  estimateCreatePoolFee,
-  formatFeeDisplay,
-  formatTotalCostDisplay,
-} from "@/shared-d/utils/stellar-fees";
+} from "@/lib/formValidation";
 
 type RoundSpeed = "30S" | "1M" | "5M";
 
@@ -35,77 +38,67 @@ interface PoolCreationData {
 
 const MIN_CAPACITY = 10;
 const MAX_CAPACITY = 1000;
-const MIN_STAKE = 10; // Minimum stake for both XLM and USDC
+// Contract requires at least 4 USDC host stake when creating a pool.
+// We mirror that as the minimum entry fee for UX simplicity.
+const MIN_STAKE = 4;
 
 export function PoolCreationModal({
   isOpen,
   onClose,
   onInitialize,
 }: PoolCreationModalProps) {
-  // Form input state (using string for better control)
   const [stakeAmountInput, setStakeAmountInput] = useState("100");
   const [currency, setCurrency] = useState<Currency>("USDC");
   const [roundSpeed, setRoundSpeed] = useState<RoundSpeed>("1M");
   const [arenaCapacity, setArenaCapacity] = useState(50);
 
-  // Validation state
   const [stakeError, setStakeError] = useState<string>("");
   const [isFormValid, setIsFormValid] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
 
-  // Refs for accessibility
   const stakeInputRef = useRef<HTMLInputElement>(null);
   const stakeErrorRef = useRef<HTMLDivElement>(null);
 
-  // Fee estimation
-  const [estimatedFee] = useState(estimateCreatePoolFee());
+  const estimatedFee = estimateGasFee();
 
-  const { isConnected, address, connect, signTransaction, balance, isLoadingBalance, refreshBalance } = useWallet();
+  const { status, address, connect } = useWallet();
+  const { addNotification } = useNotificationContext();
+  const isConnected = status === "connected";
+
   const [showTxModal, setShowTxModal] = useState(false);
   const [txDetails, setTxDetails] = useState<{ label: string; value: string | number }[]>([]);
+  const [creatorStake, setCreatorStake] = useState<number>(0);
+  const [isDepositingStake, setIsDepositingStake] = useState(false);
 
-  // Parse stake amount for calculations
   const stakeAmount = parseFloat(stakeAmountInput) || 0;
   const totalPotentialPool = stakeAmount * arenaCapacity;
   const dynamicYield = 8.42;
   const minorityWinCap = 14.5;
 
-  // Get max stake based on currency and wallet balance
-  const getMaxStake = useCallback(() => {
-    if (!isConnected) return Infinity;
-    return currency === "XLM" ? balance.xlm : balance.usdc;
-  }, [isConnected, currency, balance]);
-
-  // Validate stake amount
   const validateStake = useCallback(() => {
-    const maxStake = getMaxStake();
     const result = validateStakeAmount({
       amount: stakeAmountInput,
       currency,
       minStake: MIN_STAKE,
-      maxStake,
+      maxStake: Infinity,
     });
 
     setStakeError(result.error || "");
 
-    // Focus error if it exists (Accessibility)
     if (result.error && stakeErrorRef.current) {
       stakeErrorRef.current.focus();
     }
 
     return result.isValid;
-  }, [stakeAmountInput, currency, getMaxStake]);
+  }, [stakeAmountInput, currency]);
 
-  // Validate form on stake or currency change
   useEffect(() => {
     const isStakeValid = validateStake();
     const isCapacityValid = arenaCapacity >= MIN_CAPACITY && arenaCapacity <= MAX_CAPACITY;
     const hasStake = stakeAmountInput.trim() !== "" && stakeAmount > 0;
-
     setIsFormValid(isStakeValid && isCapacityValid && hasStake);
   }, [stakeAmountInput, stakeAmount, currency, arenaCapacity, validateStake]);
 
-  // Reset form when modal closes
   useEffect(() => {
     if (!isOpen) {
       setStakeAmountInput("100");
@@ -117,17 +110,45 @@ export function PoolCreationModal({
     }
   }, [isOpen]);
 
-  // Handle stake amount input change
+  // Fetch creator stake on open
+  useEffect(() => {
+    if (isOpen && isConnected && address) {
+      fetchCreatorStatus(address).then((s) => setCreatorStake(s.stake)).catch(() => {});
+    }
+  }, [isOpen, isConnected, address]);
+
+  const needsCreatorStake = creatorStake < 4;
+
+  const handleDepositCreatorStake = async () => {
+    if (!address) return;
+    setIsDepositingStake(true);
+    try {
+      await depositCreatorStake(address, 4);
+      setCreatorStake(4);
+      addNotification({
+        title: "Creator stake deposited",
+        message: "You can now create pools.",
+        type: "success",
+      });
+    } catch (err) {
+      addNotification({
+        title: "Deposit failed",
+        message: parseEvmError(err),
+        type: "error",
+      });
+    } finally {
+      setIsDepositingStake(false);
+    }
+  };
+
   const handleStakeAmountChange = (value: string) => {
     const sanitized = sanitizeNumericInput(value);
     const formatted = formatCurrencyInput(sanitized, currency);
     setStakeAmountInput(formatted);
   };
 
-  // Handle currency change
   const handleCurrencyChange = (newCurrency: Currency) => {
     setCurrency(newCurrency);
-    // Reformat the input for the new currency's precision
     if (stakeAmountInput) {
       const formatted = formatCurrencyInput(stakeAmountInput, newCurrency);
       setStakeAmountInput(formatted);
@@ -142,7 +163,6 @@ export function PoolCreationModal({
     setArenaCapacity((prev) => Math.min(MAX_CAPACITY, prev + 10));
   };
 
-  // Check if capacity buttons should be disabled
   const isDecreaseDisabled = arenaCapacity <= MIN_CAPACITY;
   const isIncreaseDisabled = arenaCapacity >= MAX_CAPACITY;
 
@@ -172,7 +192,7 @@ export function PoolCreationModal({
             </h2>
             <div className="bg-primary h-2 w-40 mb-4 border-b-2 border-black" />
             <p className="text-base font-medium text-slate-400 uppercase tracking-widest">
-              Deploy new arena instance to Soroban network
+              Deploy new arena instance to Arbitrum
             </p>
           </div>
 
@@ -204,32 +224,15 @@ export function PoolCreationModal({
                     aria-label="Currency selection"
                   >
                     <option value="USDC">USDC</option>
-                    <option value="XLM">XLM</option>
+                    <option value="ETH">ETH</option>
                   </select>
                 </div>
 
-                {/* Balance display */}
-                {isConnected && (
-                  <div className="mt-3 text-sm font-bold text-slate-400">
-                    {isLoadingBalance ? (
-                      <span className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-sm animate-spin">cached</span>
-                        Loading balance...
-                      </span>
-                    ) : (
-                      <span>
-                        Balance: {currency === "XLM" ? balance.xlm.toFixed(7) : balance.usdc.toFixed(2)} {currency}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Error message */}
                 {stakeError && (
                   <div
                     ref={stakeErrorRef}
                     id="stake-error"
-                    tabIndex={-1} // Make focusable for screen readers
+                    tabIndex={-1}
                     className="mt-3 text-sm font-bold text-red-500 flex items-start gap-2 outline-none"
                     role="alert"
                     aria-live="polite"
@@ -354,7 +357,7 @@ export function PoolCreationModal({
                     <div className="mt-auto pt-4">
                       <div className="bg-black/10 border-2 border-black/20 p-3 italic text-sm font-medium">
                         <span className="font-black">TACTICAL NOTE:</span> RWA yields are
-                        generated via automated Soroban-anchored Treasury vaults. Rewards are
+                        generated via automated Arbitrum-anchored Treasury vaults. Rewards are
                         distributed to the final survivors of the arena.
                       </div>
                     </div>
@@ -364,8 +367,24 @@ export function PoolCreationModal({
             </div>
 
             <div className="col-span-12 mt-4">
-              {/* Fee and Total Cost Display */}
-              {isConnected && isFormValid && (
+              {isConnected && needsCreatorStake && (
+                <div className="mb-4 bg-amber-900/30 border-3 border-amber-500/50 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <div>
+                    <p className="text-amber-200 text-sm font-black uppercase tracking-wide">Creator Stake Required</p>
+                    <p className="text-amber-200/70 text-xs mt-1">Deposit 4 USDC to unlock pool creation.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDepositCreatorStake}
+                    disabled={isDepositingStake}
+                    className="bg-amber-500 hover:bg-amber-400 text-black font-black text-xs px-6 py-2 border-2 border-black whitespace-nowrap disabled:opacity-50"
+                  >
+                    {isDepositingStake ? "Depositing..." : "Deposit 4 USDC"}
+                  </button>
+                </div>
+              )}
+
+              {isConnected && isFormValid && !needsCreatorStake && (
                 <div className="mb-4 bg-[#1e293b] border-3 border-black p-4 space-y-2">
                   <div className="flex justify-between items-center text-sm font-bold">
                     <span className="text-slate-400 uppercase tracking-wide">Estimated Network Fee:</span>
@@ -382,7 +401,7 @@ export function PoolCreationModal({
                 type="button"
                 onClick={async () => {
                   if (!isConnected) {
-                    await connect();
+                    connect();
                   } else if (isFormValid) {
                     setTxDetails([
                       { label: "Operation", value: "Create Pool" },
@@ -390,12 +409,12 @@ export function PoolCreationModal({
                       { label: "Round Speed", value: roundSpeed },
                       { label: "Capacity", value: arenaCapacity },
                       { label: "Network Fee", value: formatFeeDisplay(estimatedFee) },
-                      { label: "Network", value: "Soroban Testnet" },
+                      { label: "Network", value: "Arbitrum Sepolia" },
                     ]);
                     setShowTxModal(true);
                   }
                 }}
-                disabled={isConnected && !isFormValid}
+                disabled={isConnected && (!isFormValid || needsCreatorStake)}
                 className="w-full bg-primary text-black border-3 border-black py-6 text-2xl lg:text-3xl font-black uppercase italic tracking-tighter shadow-[4px_4px_0px_0px_#000] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-[4px_4px_0px_0px_#000]"
                 aria-label={isConnected ? "Initialize arena" : "Connect wallet"}
               >
@@ -405,7 +424,6 @@ export function PoolCreationModal({
                 </span>
               </button>
 
-              {/* Validation hint when form is invalid */}
               {isConnected && !isFormValid && (
                 <div className="mt-3 text-sm font-bold text-slate-500 text-center">
                   Please correct the errors above to continue
@@ -414,10 +432,10 @@ export function PoolCreationModal({
 
               <div className="mt-4 flex justify-center items-center gap-6 text-slate-500 font-bold text-xs uppercase tracking-widest flex-wrap">
                 <div className="flex items-center gap-2">
-                  <span className="size-2 bg-primary" /> Soroban Network
+                  <span className="size-2 bg-primary" /> Arbitrum Network
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="size-2 bg-primary" /> Smart Contract V2.4
+                  <span className="size-2 bg-primary" /> Smart Contract V1
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="size-2 bg-primary" /> Yield Verified
@@ -436,22 +454,20 @@ export function PoolCreationModal({
         details={txDetails}
         onConfirm={async () => {
           if (!address) return;
-          const tx = await buildCreatePoolTransaction(address, {
-            stakeAmount,
-            currency,
-            roundSpeed,
-            arenaCapacity,
-          });
-          const signedXdr = await signTransaction(tx.toXDR());
-          await submitSignedTransaction(signedXdr);
-          onInitialize?.({
-            stakeAmount,
-            currency,
-            roundSpeed,
-            arenaCapacity,
-          });
-          setShowTxModal(false);
-          onClose();
+          setIsDeploying(true);
+          try {
+            const poolId = await createPool(address, { stakeAmount, currency, roundSpeed, arenaCapacity });
+            addNotification({
+              title: "Pool created",
+              message: `Arena #${poolId} is live. Players can join now.`,
+              type: "success",
+            });
+            onInitialize?.({ stakeAmount, currency, roundSpeed, arenaCapacity });
+            setShowTxModal(false);
+            onClose();
+          } finally {
+            setIsDeploying(false);
+          }
         }}
         confirmLabel="Sign & Deploy"
       />

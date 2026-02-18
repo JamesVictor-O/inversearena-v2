@@ -81,31 +81,16 @@ const TelemetryBar: React.FC<TelemetryBarProps> = ({
       <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Left section: System Status & Telemetry */}
         <div className="flex items-center gap-6">
-          {/* System Status */}
-          <div
-            className={`inline-flex items-center gap-x-1.5 rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${getStatusClasses(systemStatus)}`}
-          >
-            <div
-              className={`h-1.5 w-1.5 rounded-full ${getStatusDotColor(systemStatus)}`}
-            ></div>
-            SYSTEM STATUS: {systemStatus.toUpperCase()}
-          </div>
-
-          {/* Server Telemetry */}
-          <div className="flex items-center space-x-4 text-sm text-inverse-300">
-            <span className="font-medium">REGION: {serverTelemetry.region}</span>
-            <span className="font-medium">PING: {serverTelemetry.latency}ms</span>
-          </div>
-        </div>
-
-        {/* Right section: Global Pool & Utility Actions */}
-        <div className="flex items-center gap-6">
-          {/* Global Pool */}
           <div className="text-xl font-bold text-inverse-100">
             GLOBAL POOL: {formatGlobalPool(globalPool)}
           </div>
+        </div>
 
-          {/* Utility Actions */}
+      
+        <div className="flex items-center gap-6">
+  
+
+     
           <div className="flex items-center space-x-4">
             <button
               onClick={onNotificationClick}

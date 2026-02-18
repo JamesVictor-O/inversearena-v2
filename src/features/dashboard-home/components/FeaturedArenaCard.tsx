@@ -1,17 +1,48 @@
-import type { ArenaCard } from "../types";
+"use client";
+
+import type { Arena } from "@/features/games/types";
 
 interface FeaturedArenaCardProps {
-    arena: ArenaCard;
+    arena: Arena | null;
+    isLoading?: boolean;
 }
 
-export function FeaturedArenaCard({ arena }: FeaturedArenaCardProps) {
-    const progressPercentage = (arena.currentPlayers / arena.maxPlayers) * 100;
+export function FeaturedArenaCard({ arena, isLoading }: FeaturedArenaCardProps) {
+    if (isLoading) {
+        return (
+            <div className="relative flex h-full min-h-[280px] flex-col justify-center items-center font-mono border-3 border-[#1c2739] bg-black/60 p-6">
+                <span className="text-xs text-zinc-500 uppercase tracking-[0.2em] animate-pulse">
+                    SCANNING_ONCHAIN_ARENAS...
+                </span>
+            </div>
+        );
+    }
+
+    if (!arena) {
+        return (
+            <div className="relative flex h-full min-h-[280px] flex-col justify-center items-center font-mono border-3 border-[#1c2739] bg-black/60 p-6">
+                <span className="text-xs text-zinc-500 uppercase tracking-[0.2em]">
+                    NO_ACTIVE_ARENAS
+                </span>
+                <span className="text-xs text-zinc-600 mt-2">
+                    Create the first pool to get started.
+                </span>
+            </div>
+        );
+    }
+
+    const progressPercentage = arena.maxPlayers > 0
+        ? (arena.playersJoined / arena.maxPlayers) * 100
+        : 0;
+
+    const entryFee = parseFloat(arena.stake) || 0;
+    const potentialPot = entryFee * arena.maxPlayers;
 
     return (
         <div className="relative flex h-full flex-col justify-between font-mono border-3 border-[#1c2739] bg-black/60 p-6">
-            {arena.status === "live" && (
+            {arena.status === "ACTIVE" && (
                 <div className="absolute left-6 top-6">
-                    <span className="inline-flex items-center bg-neon-green bg-primary px-2.5 py-1 text-xs font-bold tracking-wide text-black">
+                    <span className="inline-flex items-center bg-primary px-2.5 py-1 text-xs font-bold tracking-wide text-black">
                         LIVE NOW
                     </span>
                 </div>
@@ -21,23 +52,23 @@ export function FeaturedArenaCard({ arena }: FeaturedArenaCardProps) {
             <div className="mt-8">
                 <div className="flex items-start justify-between">
                     <h2 className="text-3xl font-bold tracking-tight text-white">
-                        {arena.name}
+                        ARENA {arena.number}
                     </h2>
                     <div className="text-right">
                         <div className="text-xs font-medium tracking-wider text-zinc-400">
                             CURRENT POT
                         </div>
                         <div className="text-3xl font-bold text-white">
-                            {arena.currentPot.toLocaleString()}
+                            {potentialPot.toLocaleString()}
                         </div>
                         <div className="text-sm font-medium text-zinc-400">
-                            {arena.currency}
+                            USDC
                         </div>
                     </div>
                 </div>
 
                 <p className="mt-4 max-w-md text-sm text-zinc-400">
-                    {arena.description}
+                    High-stakes elimination protocol initiated. Survive the minority vote to claim the pot.
                 </p>
             </div>
 
@@ -51,13 +82,13 @@ export function FeaturedArenaCard({ arena }: FeaturedArenaCardProps) {
                                 PLAYERS
                             </span>
                             <span className="font-mono text-zinc-300">
-                                <span className="text-[#37FF1C]">{arena.currentPlayers}</span>
+                                <span className="text-[#37FF1C]">{arena.playersJoined}</span>
                                 <span className="text-zinc-500"> / {arena.maxPlayers}</span>
                             </span>
                         </div>
                         <div className="h-2.5 w-full overflow-hidden bg-zinc-800">
                             <div
-                                className="h-full  bg-[#37FF1C] transition-all duration-500"
+                                className="h-full bg-[#37FF1C] transition-all duration-500"
                                 style={{ width: `${progressPercentage}%` }}
                             />
                         </div>
@@ -69,8 +100,8 @@ export function FeaturedArenaCard({ arena }: FeaturedArenaCardProps) {
                     </div>
 
                     {/* JOIN NOW Button */}
-                    <button
-                        type="button"
+                    <a
+                        href={`/arena?pool=${arena.id}`}
                         className="flex items-center gap-2 rounded-md bg-[#37FF1C] px-6 py-3 text-sm font-bold text-black transition-all hover:bg-[#2be012] hover:shadow-lg hover:shadow-[#37FF1C]/20 focus:outline-none focus:ring-2 focus:ring-[#37FF1C] focus:ring-offset-2 focus:ring-offset-black"
                     >
                         <svg
@@ -87,7 +118,7 @@ export function FeaturedArenaCard({ arena }: FeaturedArenaCardProps) {
                             />
                         </svg>
                         JOIN NOW
-                    </button>
+                    </a>
                 </div>
             </div>
         </div>

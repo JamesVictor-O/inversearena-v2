@@ -1,33 +1,35 @@
 'use client';
 
 import { createContext, ReactNode, useMemo } from 'react';
-import { Networks } from "@creit-tech/stellar-wallets-kit";
-
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { WalletContextType } from './types';
-import { useStellarWallet } from './useStellarWallet';
 
 export const WalletContext = createContext<WalletContextType | null>(null);
 
 export const WalletProvider = ({ children }: { children: ReactNode }) => {
-  const { publicKey, isConnected, connectWallet, disconnectWallet } = useStellarWallet(Networks.TESTNET);
+  const { address, isConnected, isConnecting, chainId } = useAccount();
+  const { openConnectModal } = useConnectModal();
+  const { disconnect } = useDisconnect();
+  const { error: connectError } = useConnect();
 
   const status = useMemo(() => {
-    if (isConnected) {
-      return 'connected';
-    }
-    // TODO: Add connecting and error states
+    if (isConnecting) return 'connecting';
+    if (isConnected) return 'connected';
+    if (connectError) return 'error';
     return 'disconnected';
-  }, [isConnected]);
+  }, [isConnected, isConnecting, connectError]);
 
   const contextValue: WalletContextType = useMemo(
     () => ({
       status,
-      publicKey: publicKey,
-      error: null, // TODO: Handle errors
-      connect: connectWallet,
-      disconnect: disconnectWallet,
+      address: address ?? null,
+      chainId: chainId ?? null,
+      error: connectError?.message ?? null,
+      connect: () => openConnectModal?.(),
+      disconnect: () => disconnect(),
     }),
-    [status, publicKey, connectWallet, disconnectWallet]
+    [status, address, chainId, connectError, openConnectModal, disconnect]
   );
 
   return <WalletContext.Provider value={contextValue}>{children}</WalletContext.Provider>;

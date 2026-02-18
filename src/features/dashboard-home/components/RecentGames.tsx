@@ -29,33 +29,39 @@ export function RecentGames({ games }: RecentGamesProps) {
 
             {/* Games List */}
             <div className="mt-4 space-y-3">
-                {games.map((game) => (
-                    <div
-                        key={game.id}
-                        className="flex items-center justify-between text-sm"
-                    >
-                        <span className="text-zinc-300">{game.arenaName}</span>
-                        <div className="flex items-center gap-2">
-                            {game.result === "eliminated" ? (
-                                <span className="font-bold tracking-wide text-[#FF0055]">
-                                    ELIMINATED
-                                    {game.round && (
-                                        <span className="ml-1 text-zinc-500">R{game.round}</span>
-                                    )}
-                                </span>
-                            ) : (
-                                <span className="font-bold tracking-wide text-[#37FF1C]">
-                                    WON
-                                    {game.prize && (
-                                        <span className="ml-1">
-                                            {game.prize.toLocaleString()} {game.currency}
-                                        </span>
-                                    )}
-                                </span>
-                            )}
-                        </div>
+                {games.length === 0 ? (
+                    <div className="text-xs text-zinc-600 uppercase tracking-wider py-4 text-center">
+                        No games played yet. Join a pool to get started.
                     </div>
-                ))}
+                ) : (
+                    games.map((game) => (
+                        <div
+                            key={game.id}
+                            className="flex items-center justify-between text-sm"
+                        >
+                            <span className="text-zinc-300">{game.arenaName}</span>
+                            <div className="flex items-center gap-2">
+                                {game.result === "eliminated" ? (
+                                    <span className="font-bold tracking-wide text-[#FF0055]">
+                                        ELIMINATED
+                                        {game.round && (
+                                            <span className="ml-1 text-zinc-500">R{game.round}</span>
+                                        )}
+                                    </span>
+                                ) : (
+                                    <span className="font-bold tracking-wide text-[#37FF1C]">
+                                        WON
+                                        {game.prize && (
+                                            <span className="ml-1">
+                                                {game.prize.toLocaleString()} {game.currency}
+                                            </span>
+                                        )}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
         </div>
     );

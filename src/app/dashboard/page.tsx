@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { FeaturedArenaCard } from "@/features/dashboard-home/components/FeaturedArenaCard";
 import { YieldGeneratorPanel } from "@/features/dashboard-home/components/YieldGeneratorPanel";
 import {
@@ -16,28 +17,29 @@ import { PoolCreationModal } from "@/components/modals/PoolCreationModal";
 import StakeModal from "@/components/modals/StakeModal";
 import TelemetryPage from "@/app/dashboard/telemetry-bar/page";
 
-import {
-  featuredArena,
-  yieldGeneratorData,
-  globalIntelItems,
-  recentGames,
-  activeAnnouncement,
-} from "@/features/dashboard-home/mockHome";
-
-const HAS_STAKED_KEY = "inversearena_has_staked";
+import { useArenas } from "@/features/games/hooks/useArenas";
+import { useCreatorStatus } from "@/features/creator/hooks/useCreatorStatus";
+import { usePolling } from "@/shared-d/hooks/usePolling";
+import { fetchGlobalStats } from "@/lib/contracts";
+import { activeAnnouncement } from "@/features/dashboard-home/mockHome";
 
 export default function DashboardHomePage() {
+  const queryClient = useQueryClient();
   const [isStakeModalOpen, setIsStakeModalOpen] = useState(false);
   const [isPoolModalOpen, setIsPoolModalOpen] = useState(false);
-  const [hasStaked, setHasStaked] = useState(false);
 
-  useEffect(() => {
-    const stored = typeof window !== "undefined" && localStorage.getItem(HAS_STAKED_KEY);
-    setHasStaked(stored === "true");
-  }, []);
+  const { hasEnoughStake } = useCreatorStatus();
+  const { data: arenas, status: arenasStatus } = useArenas(5);
+  const { data: globalStats } = usePolling(fetchGlobalStats, {
+    intervalMs: 15_000,
+    enabled: true,
+  });
+
+  const featuredArena = arenas?.[0] ?? null;
+  const arenasLoading = arenasStatus === "pending";
 
   const handleCreateArenaClick = () => {
-    if (hasStaked) {
+    if (hasEnoughStake) {
       setIsPoolModalOpen(true);
     } else {
       setIsStakeModalOpen(true);
@@ -45,25 +47,28 @@ export default function DashboardHomePage() {
   };
 
   const handleStakeSuccess = () => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(HAS_STAKED_KEY, "true");
-    }
-    setHasStaked(true);
+    queryClient.invalidateQueries({ queryKey: ["creatorStatus"] });
     setIsStakeModalOpen(false);
     setIsPoolModalOpen(true);
   };
 
   return (
     <div className="space-y-6">
-      <TelemetryPage/>
+      <TelemetryPage
+        globalPoolTotal={globalStats?.globalPoolTotal ?? 0}
+        globalPoolLoading={!globalStats}
+      />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* <TelemetryPage/> */}
         <div className="lg:col-span-2">
-          <FeaturedArenaCard arena={featuredArena} />
+          <FeaturedArenaCard arena={featuredArena} isLoading={arenasLoading} />
         </div>
 
         <div className="flex flex-col gap-4">
-          <YieldGeneratorPanel data={yieldGeneratorData} />
+          <YieldGeneratorPanel
+            globalPoolTotal={globalStats?.globalPoolTotal ?? 0}
+            totalPools={globalStats?.totalPools ?? 0}
+            isLoading={!globalStats}
+          />
 
           <div className="grid grid-cols-2 gap-4">
             <QuickActionTile
@@ -76,10 +81,10 @@ export default function DashboardHomePage() {
         </div>
       </div>
 
-      <GlobalIntelTicker items={globalIntelItems} />
+      <GlobalIntelTicker items={[]} />
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <RecentGames games={recentGames} />
+        <RecentGames games={[]} />
         <Announcements announcement={activeAnnouncement} />
         <MetricsPanel />
       </div>
@@ -93,8 +98,9 @@ export default function DashboardHomePage() {
       <PoolCreationModal
         isOpen={isPoolModalOpen}
         onClose={() => setIsPoolModalOpen(false)}
-        onInitialize={(data) => {
-          console.log("Initializing pool:", data);
+        onInitialize={() => {
+          queryClient.invalidateQueries({ queryKey: ["arenas"] });
+          queryClient.invalidateQueries({ queryKey: ["creatorStatus"] });
           setIsPoolModalOpen(false);
         }}
       />

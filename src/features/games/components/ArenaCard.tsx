@@ -1,7 +1,13 @@
-'use client'
-import React, { useState } from 'react';
-import { Arena } from '../types';
-import JoinArenaModal from '@/components/modals/JoinArenaModal';
+"use client";
+
+import React, { useState } from "react";
+import type { Address } from "viem";
+
+import { Arena } from "../types";
+import JoinArenaModal from "@/components/modals/JoinArenaModal";
+import { useWallet } from "@/features/wallet/useWallet";
+import { joinArena, parseEvmError } from "@/lib/contracts";
+import { useNotificationContext } from "@/components/ui/NotificationProvider";
 
 interface ArenaCardProps {
     arena: Arena;
@@ -9,6 +15,8 @@ interface ArenaCardProps {
 
 export const ArenaCard = ({ arena }: ArenaCardProps) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const { status, address, connect } = useWallet();
+    const { addNotification } = useNotificationContext();
 
     const handleJoinClick = () => {
         setIsModalOpen(true);
@@ -19,11 +27,31 @@ export const ArenaCard = ({ arena }: ArenaCardProps) => {
     };
 
     const handleConfirmJoin = async () => {
-        // Here you would typically handle the logic for joining the arena,
-        // like making an API call.
-        console.log(`Joining arena ${arena.id}`);
-        // Close the modal on successful confirmation
-        setIsModalOpen(false);
+        try {
+            if (status !== "connected") {
+                await connect();
+            }
+            if (!address) {
+                throw new Error("Wallet not connected");
+            }
+
+            await joinArena(address as Address, arena.id, parseFloat(arena.stake));
+
+            addNotification({
+                title: "Arena joined",
+                message: `You successfully joined ${arena.number}`,
+                type: "success",
+            });
+
+            setIsModalOpen(false);
+        } catch (err) {
+            addNotification({
+                title: "Join failed",
+                message: parseEvmError(err),
+                type: "error",
+            });
+            throw err;
+        }
     };
 
     if (arena.isFeatured) {
@@ -73,7 +101,7 @@ export const ArenaCard = ({ arena }: ArenaCardProps) => {
                     isOpen={isModalOpen}
                     onClose={handleCloseModal}
                     onConfirm={handleConfirmJoin}
-                    arenaId={parseInt(arena.number, 10)}
+                    arenaId={parseInt(arena.id, 10)}
                     requiredStake={parseInt(arena.stake.split(' ')[0], 10)}
                     currentPlayers={arena.playersJoined}
                     maxPlayers={arena.maxPlayers}
@@ -128,7 +156,7 @@ export const ArenaCard = ({ arena }: ArenaCardProps) => {
                 isOpen={isModalOpen}
                 onClose={handleCloseModal}
                 onConfirm={handleConfirmJoin}
-                arenaId={parseInt(arena.number, 10)}
+                arenaId={parseInt(arena.id, 10)}
                 requiredStake={parseInt(arena.stake.split(' ')[0], 10)}
                 currentPlayers={arena.playersJoined}
                 maxPlayers={arena.maxPlayers}

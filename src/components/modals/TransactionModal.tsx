@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
-import { parseStellarError } from "@/shared-d/utils/stellar-transactions";
+import { parseEvmError } from "@/lib/contracts";
 
 export type TransactionState = "REVIEW" | "SIGNING" | "SUBMITTING" | "SUCCESS" | "ERROR";
 
@@ -61,7 +61,7 @@ export function TransactionModal({
             console.error("Transaction failed:", err);
             setState("ERROR");
             // Use parseStellarError to get a user-friendly message
-            const parsedError = parseStellarError(err);
+            const parsedError = parseEvmError(err);
             setErrorMessage(parsedError);
         }
     }, [onConfirm]);

@@ -1,4 +1,3 @@
-// src/features/wallet/useWallet.ts
 import { useContext } from 'react';
 import { WalletContext } from './WalletProvider';
 import { WalletContextType } from './types';
